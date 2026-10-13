@@ -18,7 +18,7 @@ const int larmmin = 90;
 const int larmmax = 145;
 const int clawmin = 81;
 const int clawmax = 178;
-const int maxActPoints = 200; // 最大录制动作点数
+const int maxActPoints = 100; // 最大录制动作点数
 int dsd = 15; //运动延迟时间，用于控制电机运行速度
 int step = 1; //控制摇杆移动步长
 int samplebreak = 200; // 采样间隔（毫秒），越小动作越流畅
@@ -59,72 +59,72 @@ void setup() {
 }
 
 void loop() {
+  
   if (Serial.available()>0) {  
     char serialcmd = Serial.read();
     if ( mode == 1 ) armdatacmd(serialcmd); //指令模式
   }
 
-  
-  
   //摇杆控制
   if (analogRead(A0) > 800) {
     if (base.read() > 0) {
-      base.write((base.read() - step));
+      base.write(constrain(base.read() - step, basemin, basemax));
       delay(10);
 
     }
 
   } else if (analogRead(A0) < 200) {
     if (base.read() < 180) {
-      base.write((base.read() + step));
+      base.write(constrain(base.read() + step, basemin, basemax));
       delay(10);
 
     }
   }
   if (analogRead(A1) < 200) {
     if (larm.read() > 0) {
-      larm.write((larm.read() - step));
+      larm.write(constrain(larm.read() - step, larmmin, larmmax));
       delay(10);
 
     }
 
   } else if (analogRead(A1) > 800) {
     if (larm.read() < 180) {
-      larm.write((larm.read() + step));
+      larm.write(constrain(larm.read() + step, larmmin, larmmax));
       delay(10);
 
     }
   }
   if (analogRead(A2) > 800) {
     if (claw.read() > 0) {
-      claw.write((claw.read() - step));
+      claw.write(constrain(claw.read() - step, clawmin, clawmax));
       delay(10);
 
     }
 
   } else if (analogRead(A2) < 200) {
     if (claw.read() < 180) {
-      claw.write((claw.read() + step));
+      claw.write(constrain(claw.read() + step, clawmin, clawmax));
       delay(10);
 
     }
   }
   if (analogRead(A3) > 800) {
     if (rarm.read() > 0) {
-      rarm.write((rarm.read() - step));
+      rarm.write(constrain(rarm.read() - step, rarmmin, rarmmax));
       delay(10);
 
     }
 
   } else if (analogRead(A3) < 200) {
     if (rarm.read() < 180) {
-      rarm.write((rarm.read() + step));
+      rarm.write(constrain(rarm.read() + step, rarmmin, rarmmax));
       delay(10);
 
     }
   }
 
-
+  //录制函数调用
+  recordaction();
 
 }
 
@@ -137,7 +137,7 @@ void armdatacmd(char serialcmd) {
   else if (serialcmd == 'x') {
     String buf = Serial.readStringUntil('\n');
     int x,y,z;
-    if(sscanf(buf.c_str(), "%d y%d z%d", &x,&y,&z) == 3){
+    if(sscanf(buf.c_str(), "%d,y%d,z%d", &x,&y,&z) == 3){
       servocmd('b', x, dsd);
       servocmd('l', y, dsd);
       servocmd('r', z, dsd);
@@ -204,11 +204,11 @@ void armdatacmd(char serialcmd) {
         isPlaying = false;
         lastsample = millis();
         Serial.println("Start recording");
-        recordaction();
         break;
 
       case 'E' : //结束录制
         isRecording = false;
+        Serial.println("Stop recording");
         break;
 
       case 'P' : //回放动作

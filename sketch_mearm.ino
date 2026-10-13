@@ -19,6 +19,7 @@ const int larmmax = 145;
 const int clawmin = 81;
 const int clawmax = 178;
 const int maxActPoints = 100; // 最大录制动作点数
+const int l1,l2,baseoffset,rarmoffset,larmoffset;
 int dsd = 15; //运动延迟时间，用于控制电机运行速度
 int step = 1; //控制摇杆移动步长
 int samplebreak = 200; // 采样间隔（毫秒），越小动作越流畅
@@ -374,4 +375,48 @@ void replayaction() {
   }
   isPlaying = false;
   Serial.println("Replay Finished.");
+}
+
+//解析坐标控制机械臂移动
+bool movetoxyz(float x, float y, float z) {
+  float r = sqrt(x * x + y * y);
+  float d = sqrt(r * r + z * z);
+
+  // 可达性校验
+  if (d > l1 + l2 || d < fabs(l1 - l2)) {
+    return false;
+  }
+
+  // 底座旋转角 θ₀
+  float theta0 = atan2(y, x);
+
+  // 小臂角 θ₂
+  float cosalpha = (l1*l1 + l2*l2 - d*d) / (2.0 * l1 * l2);
+  cosalpha = constrain(cosalpha, -1.0, 1.0);
+  float alpha = acos(cosalpha);
+  float theta2 = PI - alpha;
+
+  // 大臂角 θ₁
+  float beta = atan2(z, r);
+  float cosgamma = (l1*l1 + d*d - l2*l2) / (2.0 * l1 * d);
+  cosgamma = constrain(cosgamma, -1.0, 1.0);
+  float gamma = acos(cosgamma);
+  float theta1 = beta - gamma;
+
+  // 弧度转角度 + 零点偏移 → 实际舵机角度
+  int angbase  = round(theta0 * 180.0 / PI) + baseoffset;
+  int angrarm = round(theta1 * 180.0 / PI) + rarmoffset;
+  int anglarm = round(theta2 * 180.0 / PI) + larmoffset;
+
+  // 硬件限位保护
+  angbase  = constrain(angbase, basemin, basemax);
+  angrarm = constrain(angrarm, rarmmin, rarmmax);
+  anglarm = constrain(anglarm, larmmin, larmmax);
+
+  // 调用原有移动函数，驱动三个舵机
+  servocmd('b', angbase, dsd);
+  servocmd('r', angrarm, dsd);
+  servocmd('l', anglarm, dsd);
+
+  return true;
 }

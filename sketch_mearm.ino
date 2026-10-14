@@ -12,14 +12,19 @@ struct ActionPoint {
 //存储电机极限值
 const int basemin = 0;
 const int basemax = 180;
-const int rarmmin = 20;
-const int rarmmax = 115;
-const int larmmin = 90;
-const int larmmax = 145;
+const int rarmmin = 90;
+const int rarmmax = 145;
+const int larmmin = 20;
+const int larmmax = 115;
 const int clawmin = 81;
 const int clawmax = 178;
 const int maxActPoints = 100; // 最大录制动作点数
-const int l1,l2,baseoffset,rarmoffset,larmoffset;
+const float l1 = 8.0; //大臂长
+const float l2 = 8.0; //小臂长
+const float h = 6.0; //底座高度
+const int baseoffset = 0;
+const int rarmoffset = 135;
+const int larmoffset = 50;
 int dsd = 15; //运动延迟时间，用于控制电机运行速度
 int step = 1; //控制摇杆移动步长
 int samplebreak = 200; // 采样间隔（毫秒），越小动作越流畅
@@ -27,11 +32,10 @@ int actionCnt = 0; //已录制动作点数
 unsigned long lastsample = 0; // 上一次采样的时间
 ActionPoint actionBuf[maxActPoints]; // 动作缓冲区
 
+int state = 2; //循环按钮计数
 bool mode = 1; //1为指令模式，0待定
 bool isRecording = false; // 录制状态标志
 bool isPlaying = false; // 回放状态标志
-
-
 
 void setup() {
   //获取引脚数据
@@ -46,14 +50,15 @@ void setup() {
 
   
   //初始化舵机位置
-  base.write(90); 
-  delay(10);
-  larm.write(20); 
-  delay(10);
-  rarm.write(90); 
-  delay(10);
-  claw.write(81);  
-  delay(10); 
+  armInipos();
+  //base.write(90); 
+  //delay(10);
+  //larm.write(20); 
+  //delay(10);
+  //rarm.write(90); 
+  //delay(10);
+  //claw.write(81);  
+  //delay(10); 
   
   Serial.begin(9600);
   Serial.println("Robot Arm Set Up");
@@ -138,12 +143,13 @@ void armdatacmd(char serialcmd) {
   else if (serialcmd == 'x') {
     String buf = Serial.readStringUntil('\n');
     int x,y,z;
-    if(sscanf(buf.c_str(), "%d,y%d,z%d", &x,&y,&z) == 3){
+    if(sscanf(buf.c_str(), "%d,y%d,z%d", &x,&y,&z) == 3) {
       servocmd('b', x, dsd);
       servocmd('l', y, dsd);
       servocmd('r', z, dsd);
+      //movetoxyz(x,y,z);
     }
-  }
+    }
   else {
     switch(serialcmd) {   
  
@@ -156,11 +162,11 @@ void armdatacmd(char serialcmd) {
         break;
 
       case 'O' : //机械臂爪子张开
-        servocmd('c',0,dsd);
+        servocmd('c',81,dsd);
         break;
       
       case 'S' : //机械臂爪子关闭
-        servocmd('c',90,dsd);
+        servocmd('c',178,dsd);
         break;
       
       case 'H' : //提升机械臂整体运行速度
@@ -177,26 +183,99 @@ void armdatacmd(char serialcmd) {
  
       case 'A' : //夹取物体A
         armInipos();//移动到初始位置
-        //null;//移动至A位置
-        servocmd('c',90,dsd);//机械臂爪子关闭
-        //null;//移动
-        servocmd('c',0,dsd);//机械臂爪子张开
+        servocmd('c',81,dsd);//机械臂爪子张开
+        servocmd('b',129,dsd);//移动至A位置
+        servocmd('l',112,dsd);
+        servocmd('r',81,dsd);
+        servocmd('c',178,dsd);//机械臂爪子关闭
+        armInipos();//移动到初始位置
+        servocmd('b',51,dsd);//移动至A'位置
+        servocmd('l',112,dsd);
+        servocmd('r',81,dsd);
+        servocmd('c',81,dsd);//机械臂爪子张开
+        armInipos();//移动到初始位置
         break;
       
       case 'B' : //夹取物体B
         armInipos();//移动到初始位置
-        //null;//移动至B位置
-        servocmd('c',90,dsd);//机械臂爪子关闭
-        //null;//移动
-        servocmd('c',0,dsd);//机械臂爪子张开
+        servocmd('c',81,dsd);//机械臂爪子张开
+        servocmd('b',160,dsd);//移动至B位置
+        servocmd('l',106,dsd);
+        servocmd('r',85,dsd);
+        servocmd('c',178,dsd);//机械臂爪子关闭
+        armInipos();//移动到初始位置
+        servocmd('b',20,dsd);//移动至B'位置
+        servocmd('l',106,dsd);
+        servocmd('r',85,dsd);
+        servocmd('c',81,dsd);//机械臂爪子张开
+        armInipos();//移动到初始位置
         break;
       
       case 'C' : //夹取物体C
         armInipos();//移动到初始位置
-        //null;//移动至C位置
-        servocmd('c',90,dsd);//机械臂爪子关闭
-        //null;//移动
-        servocmd('c',0,dsd);//机械臂爪子张开
+        servocmd('c',81,dsd);//机械臂爪子张开
+        //servocmd('b',,dsd);//移动至C位置
+        //servocmd('l',,dsd);
+        //servocmd('r',,dsd);
+        servocmd('c',178,dsd);//机械臂爪子关闭
+        armInipos();//移动到初始位置
+        //servocmd('b',,dsd);//移动至C'位置
+        //servocmd('l',,dsd);
+        //servocmd('r',,dsd);
+        servocmd('c',81,dsd);//机械臂爪子张开
+        armInipos();//移动到初始位置
+        break;
+      
+      case 'K' :
+        state = (state + 1) % 3;
+        switch (state) {
+
+          case 0 : //夹取A物体
+            armInipos();//移动到初始位置
+            servocmd('c',81,dsd);//机械臂爪子张开
+            servocmd('b',129,dsd);//移动至A位置
+            servocmd('l',112,dsd);
+            servocmd('r',81,dsd);
+            servocmd('c',178,dsd);//机械臂爪子关闭
+            armInipos();//移动到初始位置
+            servocmd('b',51,dsd);//移动至A'位置
+            servocmd('l',112,dsd);
+            servocmd('r',81,dsd);
+            servocmd('c',81,dsd);//机械臂爪子张开
+            armInipos();//移动到初始位置
+            break;
+          
+          case 1 : //夹取B物体
+            armInipos();//移动到初始位置
+            servocmd('c',81,dsd);//机械臂爪子张开
+            servocmd('b',160,dsd);//移动至B位置
+            servocmd('l',106,dsd);
+            servocmd('r',85,dsd);
+            servocmd('c',178,dsd);//机械臂爪子关闭
+            armInipos();//移动到初始位置
+            servocmd('b',20,dsd);//移动至B'位置
+            servocmd('l',106,dsd);
+            servocmd('r',85,dsd);
+            servocmd('c',81,dsd);//机械臂爪子张开
+            armInipos();//移动到初始位置
+            break;
+
+          case 2 : //夹取C物体
+            armInipos();//移动到初始位置
+            servocmd('c',81,dsd);//机械臂爪子张开
+            //servocmd('b',,dsd);//移动至C位置
+            //servocmd('l',,dsd);
+            //servocmd('r',,dsd);
+            servocmd('c',178,dsd);//机械臂爪子关闭
+            armInipos();//移动到初始位置
+            //servocmd('b',,dsd);//移动至C'位置
+            //servocmd('l',,dsd);
+            //servocmd('r',,dsd);
+            servocmd('c',81,dsd);//机械臂爪子张开
+            armInipos();//移动到初始位置
+            break;
+
+        }
         break;
       
       case 'R' : //开始录制
@@ -227,6 +306,14 @@ void armdatacmd(char serialcmd) {
         isPlaying = false;
         Serial.println("Have cleared record");
         break;
+
+      case 'F' :
+        movetoxyz(5,10,10);
+        delay(10);
+        movetoxyz(10,10,10);
+        delay(10);
+        movetoxyz(0,10,10);
+        delay(10);
       
       default:  //未知指令反馈
         Serial.println("Unknown Command.");
@@ -236,7 +323,7 @@ void armdatacmd(char serialcmd) {
 }
 
 //控制机械臂运动的函数
-void servocmd(char servoname, int topos, int servodelay){  
+void servocmd(char servoname, int topos, int servodelay) {  
   
   Servo servogo;  //创建servo对象便于控制
  
@@ -321,7 +408,7 @@ void armInipos() {
     {'b', 90, dsd},
     {'r', 90, dsd},
     {'l', 20, dsd},
-    {'c', 81, dsd} 
+    {'c', 178, dsd} 
   };
  
   for (int i = 0; i < 4; i++){
@@ -378,13 +465,15 @@ void replayaction() {
 }
 
 //解析坐标控制机械臂移动
-bool movetoxyz(float x, float y, float z) {
+bool movetoxyz(float x, float y, float z0) {
+  float z = z0 - h;
   float r = sqrt(x * x + y * y);
   float d = sqrt(r * r + z * z);
 
   // 可达性校验
   if (d > l1 + l2 || d < fabs(l1 - l2)) {
     return false;
+    Serial.println("Can't move to.");
   }
 
   // 底座旋转角 θ₀
@@ -405,8 +494,8 @@ bool movetoxyz(float x, float y, float z) {
 
   // 弧度转角度 + 零点偏移 → 实际舵机角度
   int angbase  = round(theta0 * 180.0 / PI) + baseoffset;
-  int angrarm = round(theta1 * 180.0 / PI) + rarmoffset;
-  int anglarm = round(theta2 * 180.0 / PI) + larmoffset;
+  int angrarm = -1*round(theta1 * 180.0 / PI) + rarmoffset;
+  int anglarm = round(theta2 * 180.0 / PI) - larmoffset;
 
   // 硬件限位保护
   angbase  = constrain(angbase, basemin, basemax);
@@ -414,6 +503,7 @@ bool movetoxyz(float x, float y, float z) {
   anglarm = constrain(anglarm, larmmin, larmmax);
 
   // 调用原有移动函数，驱动三个舵机
+  Serial.println("Move.");
   servocmd('b', angbase, dsd);
   servocmd('r', angrarm, dsd);
   servocmd('l', anglarm, dsd);
